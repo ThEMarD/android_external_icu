@@ -166,7 +166,14 @@ def MakeTzDataFiles(icu_build_dir, iana_tar_file):
   zoneinfo_file = '%s/zoneinfo64.txt' % tzcode_working_dir
   icu_txt_data_dir = '%s/data/misc' % icu4cDir()
   print('Copying zoneinfo64.txt to %s ...' % icu_txt_data_dir)
-  shutil.copy(zoneinfo_file, icu_txt_data_dir)
+  # tz2icu stamps the header with the time it ran, which would make every run of
+  # this script write a different file. That comment is the only build-dependent
+  # line in the file, so it is left out of the copy that goes into the tree.
+  zoneinfo_dest_file = '%s/zoneinfo64.txt' % icu_txt_data_dir
+  with open(zoneinfo_file) as zoneinfo_src, open(zoneinfo_dest_file, 'w') as zoneinfo_dest:
+    for line in zoneinfo_src:
+      if not line.startswith('// Build date:'):
+        zoneinfo_dest.write(line)
 
 
 def MakeAndCopyIcuDataFiles(icu_build_dir, copy_icu4c_dat_file_only=False):
@@ -230,9 +237,11 @@ def CopyIcu4jDataFiles():
     icu_jarfile = os.path.join(icu_jar_data_dir, os.path.basename(jarfile))
     if ziputil.ZipCompare(jarfile, icu_jarfile):
       print('Ignoring %s which is identical to %s ...' % (jarfile, icu_jarfile))
-    else:
-      print('Copying %s to %s ...' % (jarfile, icu_jar_data_dir))
-      shutil.copy(jarfile, icu_jar_data_dir)
+      continue
+    print('Copying %s to %s ...' % (jarfile, icu_jar_data_dir))
+    # Written through WriteZipCanonical() so that the jar in the tree comes out
+    # the same whether or not the same JDK built the copy already there.
+    ziputil.WriteZipCanonical(icu_jarfile, ziputil.ReadZipEntries(jarfile))
 
 def MakeAndCopyIcuTzFiles(icu_build_dir, res_dest_dir):
   """Makes .res files containing just time zone data.
